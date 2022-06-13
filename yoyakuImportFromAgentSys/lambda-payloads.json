@@ -1,0 +1,175 @@
+{
+    "yoyakuImportFromAgentSys": {
+        "lambda": {
+            "Records": [
+                {
+                    "eventID": "deee3e30198015a16fa2f3ae5a3a23b2",
+                    "eventName": "INSERT",
+                    "eventVersion": "1.1",
+                    "eventSource": "aws:dynamodb",
+                    "awsRegion": "ap-northeast-1",
+                    "dynamodb": {
+                        "ApproximateCreationDateTime": 1627045987,
+                        "Keys": {
+                            "dept_datetime": {
+                                "S": "2021/8/4 10:00:00"
+                            },
+                            "reserveno": {
+                                "S": "ap-northeast-1:f24ced33-8754-4901-b50c-1b23b6f9cf73"
+                            }
+                        },
+                        "NewImage": {
+                            "option_txt": {
+                                "S": ""
+                            },
+                            "option_charge": {
+                                "N": "0"
+                            },
+                            "reserve_no": {
+                                "S": ""
+                            },
+                            "carinfo": {
+                                "L": [
+                                    {
+                                        "M": {
+                                            "option_txt": {
+                                                "S": ""
+                                            },
+                                            "noc": {
+                                                "N": "0"
+                                            },
+                                            "option_charge": {
+                                                "N": "0"
+                                            },
+                                            "car_numbers": {
+                                                "N": "1"
+                                            },
+                                            "babysheet": {
+                                                "N": "0"
+                                            },
+                                            "car_plan_name": {
+                                                "S": "一般お客様プラン（宮古空港本店）"
+                                            },
+                                            "jrsheet": {
+                                                "N": "0"
+                                            },
+                                            "subtotal": {
+                                                "N": "7220"
+                                            },
+                                            "basic_charge": {
+                                                "N": "7220"
+                                            },
+                                            "planname": {
+                                                "S": "一般お客様プラン（宮古空港本店）"
+                                            },
+                                            "babycar": {
+                                                "N": "0"
+                                            },
+                                            "childsheet": {
+                                                "N": "0"
+                                            },
+                                            "planid": {
+                                                "N": "12"
+                                            },
+                                            "car_class": {
+                                                "S": "C2"
+                                            },
+                                            "key": {
+                                                "N": "0"
+                                            }
+                                        }
+                                    }
+                                ]
+                            },
+                            "reserve_email": {
+                                "S": "kawashima@pine-company.jp"
+                            },
+                            "arrival": {
+                                "S": ""
+                            },
+                            "totalPrice": {
+                                "N": "7220"
+                            },
+                            "created_at": {
+                                "N": "1641651471252"
+                            },
+                            "arr_on_dept": {
+                                "S": ""
+                            },
+                            "depttimestamp": {
+                                "N": "1641866400000"
+                            },
+                            "people_num": {
+                                "N": "1"
+                            },
+                            "car_plan_name": {
+                                "S": "Keiji Kawashima限定プラン"
+                            },
+                            "company": {
+                                "S": "14"
+                            },
+                            "dept_datetime": {
+                                "S": "2022/1/11 11:00:00"
+                            },
+                            "reserve_phone": {
+                                "S": "08088188622"
+                            },
+                            "cs_purpose": {
+                                "S": ""
+                            },
+                            "reserveKey": {
+                                "S": "pinerentacar_1641651471252"
+                            },
+                            "reserve_nationality": {
+                                "S": ""
+                            },
+                            "reserve_no_related": {
+                                "S": ""
+                            },
+                            "arrive_datetime": {
+                                "S": "2022/1/12 11:00:00"
+                            },
+                            "reserve_name": {
+                                "S": "Kawashima"
+                            },
+                            "reserveno": {
+                                "S": "ap-northeast-1:f24ced33-8754-4901-b50c-1b23b6f9cf73"
+                            },
+                            "dep_on_leave": {
+                                "S": ""
+                            },
+                            "basic_charge": {
+                                "N": "7220"
+                            },
+                            "reserve_ed_place": {
+                                "S": "下地島空港店"
+                            },
+                            "arr_sales": {
+                                "N": "2"
+                            },
+                            "dept_sales": {
+                                "N": "1"
+                            },
+                            "reservedBy": {
+                                "S": "k.kawashima@ocean-travel.jp"
+                            },
+                            "departure": {
+                                "S": ""
+                            },
+                            "reserve_st_place": {
+                                "S": "宮古空港本店"
+                            },
+                            "remarks": {
+                                "S": ""
+                            }
+                        },
+                        "SequenceNumber": "1148155400000000007243447496",
+                        "SizeBytes": 882,
+                        "StreamViewType": "NEW_IMAGE"
+                    },
+                    "eventSourceARN": "arn:aws:dynamodb:ap-northeast-1:141671916837:table/rentacaragent-prod/stream/2020-11-24T08:21:36.211"
+                }
+            ]
+        }
+    }
+}
