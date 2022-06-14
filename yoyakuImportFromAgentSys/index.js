@@ -4,7 +4,7 @@ const AWS = require('aws-sdk');
 const fs = require('fs');
 
 const baseScopeUrl = "https://oceantravel.scopeapps.net/"
-const contractid = 2;
+const contract_id = 1;
 
 exports.handler = async (event, context) => {
     for (const record of event.Records) {
@@ -306,15 +306,12 @@ async function generateReqJson(data){
           let otaid = 0;
           let agentname = "";
           if(data["company"]){
-              const otaInfo = await fetchOtaInfo(parseInt(data["agent"]))
+              const otaInfo = await fetchOtaInfo(parseInt(data["company"]))
               otaid = otaInfo.agentid;
               agentname = otaInfo.agentname;
           }
           const class_id = await convertCarClassId(data["car_class"]);
-          let routecate = 6;
-          if(data["agent"]){
-              routecate = 11;
-          }
+          let routecate = 11;
           let note = "";
           if(data["note"]){
             note = data["note"];
@@ -351,6 +348,7 @@ async function generateReqJson(data){
               car_plan_id: (data["car_plan_id"] || 0).toString(),
               car_plan_name: (data["car_plan_name"] || "").toString(),
               car_class: data["car_class"],
+              agentname: agentname
           }
           for(let j = 0; j < reqData.length; j++){
             if(!reqData[j]){
@@ -493,14 +491,14 @@ async function importReserves(reqData,rawJson){
 
 async function sendErrToShops(reqData, rawJson){
   let params = {
-    'agentname': rawJson.ota_name,
+    'agentname': reqData.agentname || "()",
     'reserveno': reqData.car_reservation_no,
     'csname': reqData.Kana1,
     'dept_datetime': reqData.date,
     'arr_datetime': reqData.dateE,
-    'dept_shopname': rawJson.start_office,
-    'car_class': reqData.carClass,
-    'reserved_datetime': reqData,reserved_datetime,
+    'dept_shopname': rawJson.reserve_st_place,
+    'car_class': rawJson.car_class,
+    'reserved_datetime': reqData.reserved_datetime || new Date(),
     'cid': contract_id
   }
   let url = "https://admincontrol.carcontroller.net/api/v1/notify";
@@ -513,14 +511,14 @@ async function sendErrToShops(reqData, rawJson){
 }
 
 async function sendReserveMail(data, email){
-  var honbun_read = await getHonbun(1, data.company);
+  var honbun_read = await getHonbun(data.company, 1);
   let honbun = honbun_read.toString();
   const dataGen = data;
   
   let keys = Object.keys(data)
   console.log("keys")
   console.log(keys)
-  const subHonbun = await genMailHonbun(data,dataGen,keys,honbun)
+  const subHonbun = await genMailHonbun(dataGen,keys,honbun)
   honbun = subHonbun
   console.log(honbun)
   let sendTo = dataGen["reserve_email"]
@@ -581,7 +579,7 @@ async function getHonbun(agent, type){
         Authorization: "Bearer " + token
       }
     }
-    console.log(params)
+    console.log(url)
     const execUpdate = await axios.get(url, params)
     console.log(execUpdate.data)
     if(execUpdate.status == 200){
@@ -595,17 +593,16 @@ async function getHonbun(agent, type){
   }
 }
 
-async function genMailHonbun(data,dataGen,keys,honbun){
+async function genMailHonbun(dataGen,keys,honbun){
   return new Promise(function(resolve, reject){
     console.log(keys.length)
     try{
       //for(let g = 0; g < keys.length; g++){
       let g = 0;
       keys.forEach(function(replaceKey){
-        let taisyo = "[["+replaceKey+"]]"
+        let taisyo = "@@"+replaceKey+"@@"
         let after = dataGen[replaceKey]
         honbun = honbun.replace(new RegExp(taisyo, 'g'), after)
-        //console.log(g+1,keys.length)
         if(g + 1 == keys.length){
           resolve(honbun)
         }
