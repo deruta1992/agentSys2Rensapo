@@ -3,13 +3,14 @@ const axios = require('axios');
 const AWS = require('aws-sdk');
 const fs = require('fs');
 
+const baseScopeUrl = "https://oceantravel.scopeapps.net/"
+const contractid = 2;
+
 exports.handler = async (event, context) => {
-    //console.log('Received event:', JSON.stringify(event, null, 2));
     for (const record of event.Records) {
       try{
         console.log(record.eventID);
         console.log(record.eventName);
-        //console.log('DynamoDB Record: %j', record.dynamodb);
         switch(record.eventName){
         case "INSERT":
           let data = record.dynamodb.NewImage;
@@ -40,6 +41,7 @@ exports.handler = async (event, context) => {
                   data["noc_charge"] = 0;
                 }
                 //
+                data["number_of_people"] = {"S": data["people_num"]["N"]};
                 data["reserve_st_place"] = {"S": data["reserve_st_place"]["S"]};
                 data["reserve_ed_place"] = {"S": data["reserve_ed_place"]["S"]}
                 data["departure"] = {"S": data["departure"]["S"]};
@@ -48,6 +50,7 @@ exports.handler = async (event, context) => {
                 data["option_txt"] = {"S": optionTxt};
                 data["carnum"] = {"N": dataPre["car_numbers"]["N"]};
                 data["totalPrice"] ={"N":subtotal};
+                data["reservation_no"] = {"S": data["reserveno"]["S"]}
                 const dataProcess = await convertAndImportRecord(data);
                 const sendReserveMails = await sendReserveMail(dataProcess["data"],email);
                 const agsysRelate = await recordAlotUsage(dataProcess["data"])
@@ -197,7 +200,7 @@ async function recordAlotUsage(data, opeType){
   //
   try{
     const token = await getAuthToken()
-    let url = "https://oceantravel.scopeapps.net/api/rentacar/agent/zaiko/update"
+    let url = baseScopeUrl + "api/rentacar/agent/zaiko/update"
     let params = {
       headers: {
         ContentType: "application/json",
@@ -235,7 +238,7 @@ async function convertToDate8Str(dateStr){
 }
 
 async function getAuthToken(){
-    let authUrl = "https://oceantravel.scopeapps.net/api/authenticate";
+    let authUrl = baseScopeUrl + "api/authenticate";
     let params = {
         email: "system@ocean-travel.jp",
         password: "Ocean-385"
@@ -254,11 +257,11 @@ async function convertAndImportRecord(params){
     const reqDatagen = await generateReqJson(dataGen);
     console.log(reqDatagen);
     if(reqDatagen.result == "success" && dataGen["ota_id"] != 2){
-      const reserve = await importReserves(reqDatagen.data);
+      const reserve = await importReserves(reqDatagen.data,dataGen);
       console.log(reserve)
       if(!reserve.body.result){
         console.log("API Request Failed");
-        
+        await sendErrToShops(reqDatagen.data,dataGen)
       }
     }
     return {
@@ -266,78 +269,6 @@ async function convertAndImportRecord(params){
     }
     //callback();
 };
-
-async function convertOffice(office){
-  let data = 0;
-  switch(office){
-    case "久貝バイパス店": data = 1; break;
-    case "宮古空港本店": data = 2; break;
-    case "下地島空港店": data = 3; break;
-    case "ブルーオーシャン店": data = 4; break;
-    default: data = 0; break;
-  }  
-  return data;
-}
-
-async function getOtaid(resotaid){
-  let otaid = resotaid;
-  switch(resotaid){
-    case 1: otaid = 12; break;//SkyTicket	pine	Ocean385
-    //case 2: //たびんふぉ	pine0317	pine0317
-    case 3: otaid = 11; break;//じゃらん	PIN001	i5Vw-dlCB
-    case 4: otaid = 14; break;//レンナビ	pinerent02	Fnai7Bm1K
-    case 5: otaid = 13; break;//沖楽	pine_rentacar	Ai344Nz2dMAe
-    case 6: otaid = 10; break;//楽天
-  }
-  return otaid;
-}
-async function genCarClass(carClass){
-  let class_id = 0;
-  switch(carClass){
-    case "K1": class_id = 12; break;
-    case "K2": class_id = 13; break;
-    case "C1": class_id = 14; break;
-    case "C2": class_id = 15; break;
-    case "C3": class_id = 16; break;
-    case "W1": class_id = 17; break;
-    case "W2": class_id = 18; break;
-    case "W3": class_id = 19; break;
-    case "S": class_id = 20; break;
-    case "C": class_id = 15; break;
-    default: 
-      if(carClass.indexOf("C1") > 0){
-        class_id = 14;
-      } else if(carClass.indexOf("C2") > 0){
-        class_id = 15;
-      } else if(carClass.indexOf("C3") > 0){
-        class_id = 16;
-      } else if(carClass.indexOf("W1") > 0){
-        class_id = 17;
-      } else if(carClass.indexOf("W2") > 0){
-        class_id = 18;
-      } else if(carClass.indexOf("W3") > 0){
-        class_id = 19;
-      } else if(carClass.indexOf("S") > 0){
-        class_id = 20;
-      } else if(carClass.indexOf("K1") > 0){
-        class_id = 15;
-      } else if(carClass.indexOf("K1") > 0){
-        class_id = 12;
-      } else if(carClass.indexOf("K2") > 0){
-        class_id = 13;
-      } else if(carClass.indexOf("K") > 0){
-        // Kは一時的にK2に割り当てる
-        class_id = 13;
-      } else if(carClass.indexOf("C") > 0){
-        // Cは一時的にC2に割り当てる
-        class_id = 15;
-      } else {
-        class_id = 1;
-      }
-    break;
-  }
-  return class_id;
-}
 
 async function generateReqJson(data){
     try{
@@ -372,80 +303,14 @@ async function generateReqJson(data){
           if(data["reserve_phone"]){
             phone = data["reserve_phone"];
           }
-          let otaid;
-          let agentname;
-          if(data["agent"]){
-              switch(parseInt(data["agent"])){
-                case 1: otaid = 46; agentname = "jetstar"; break; //jetstar
-                case 2: otaid = 44; agentname = "skymark"; break; //skymark
-                case 3: otaid = 45; agentname = "skypack"; break; //skypack
-                case 4: otaid = 47; agentname = "日本空輸"; break; //日本空輸
-                case 5: otaid = 12; agentname = "stayjapan"; break; //stayjapan
-                default: otaid = 4; agentname = "そのほかエージェント"; break;
-              }
-          } else {
-              switch(parseInt(data["ota_id"])){
-                case 1: otaid = 12; break;//SkyTicket	pine	Ocean385
-                //case 2: //たびんふぉ	pine0317	pine0317
-                case 3: otaid = 11; break;//じゃらん	PIN001	i5Vw-dlCB
-                case 4: otaid = 14; break;//レンナビ	pinerent02	Fnai7Bm1K
-                case 5: otaid = 13; break;//沖楽	pine_rentacar	Ai344Nz2dMAe
-                case 6: otaid = 10; break;//楽天
-                default: otaid = 4; break;
-              }
-          }
-          let class_id;
-          let carClass = data["car_class"];
-          console.log(carClass);
-          switch(carClass){
-            case "K1": class_id = 12; break;
-            case "K2": class_id = 13; break;
-            case "C1": class_id = 14; break;
-            case "C2": class_id = 15; break;
-            case "C3": class_id = 16; break;
-            case "W1": class_id = 17; break;
-            case "W2": class_id = 18; break;
-            case "W3": class_id = 19; break;
-            case "S": class_id = 20; break;
-            case "C": class_id = 15; break;
-            default: 
-              if(carClass.indexOf("C1") > 0){
-                class_id = 14;
-              } else if(carClass.indexOf("C2") > 0){
-                class_id = 15;
-              } else if(carClass.indexOf("C3") > 0){
-                class_id = 16;
-              } else if(carClass.indexOf("W1") > 0){
-                class_id = 17;
-              } else if(carClass.indexOf("W2") > 0){
-                class_id = 18;
-              } else if(carClass.indexOf("W3") > 0){
-                class_id = 19;
-              } else if(carClass.indexOf("S") > 0){
-                class_id = 20;
-              } else if(carClass.indexOf("K1") > 0){
-                class_id = 15;
-              } else if(carClass.indexOf("K1") > 0){
-                class_id = 12;
-              } else if(carClass.indexOf("K2") > 0){
-                class_id = 13;
-              } else if(carClass.indexOf("K") > 0){
-                // Kは一時的にK2に割り当てる
-                class_id = 13;
-              } else if(carClass.indexOf("C") > 0){
-                // Cは一時的にC2に割り当てる
-                class_id = 15;
-              } else {
-                class_id = 1;
-              }
-            break;
-          }
-          let otaname = "";
+          let otaid = 0;
+          let agentname = "";
           if(data["company"]){
-              otaname = agentname;
-          } else {
-              otaname = data["ota_name"];
+              const otaInfo = await fetchOtaInfo(parseInt(data["agent"]))
+              otaid = otaInfo.agentid;
+              agentname = otaInfo.agentname;
           }
+          const class_id = await convertCarClassId(data["car_class"]);
           let routecate = 6;
           if(data["agent"]){
               routecate = 11;
@@ -454,28 +319,17 @@ async function generateReqJson(data){
           if(data["note"]){
             note = data["note"];
           }
-          let startid = 0;
-          switch(parseInt(data["dept_sales"])){
-            case 1: startid = 2; break;
-            case 2: startid = 3; break;
-            case 3: startid = 1; break;
-            default: break;
-          }
-          
-          let endid = 0;
-          switch(parseInt(data["arr_sales"])){
-            case 1: endid = 2; break;
-            case 2: endid = 3; break;
-            case 3: endid = 1; break;
-            default: break;
-          }
+          let startid = data["dept_sales"];
+          if(!startid){ startid = 0; }
+          let endid = data["arr_sales"];
+          if(!endid){ endid = 0; }
           //レスポンスする値
           let reqData = {
               Kana1: data["reserve_name"],
               Kana2: " ",
               email: email,
-              work_memo_yoyaku: "(APIにて登録 from "+otaname+")" + note,
-              people: data["number_of_people"],
+              work_memo_yoyaku: "(APIにて登録 from "+agentname+")" + note,
+              people: (data["number_of_people"] || 1),
               phone1: phone,
               category1: routecate,
               category2: otaid,
@@ -489,13 +343,13 @@ async function generateReqJson(data){
               dateE: arrive.date,
               timeE: arrive.time,
               carnum: 1,
-              basic_price: parseInt(data["basic_charge"]),
+              basic_price: (parseInt(data["basic_charge"]) || 0),
               location_price: 0,//乗り捨て料金
               opt_total_price: optionTotal,
               //オプション
               car_reservation_no: data["reservation_no"],
-              car_plan_id: data["car_plan_id"],
-              car_plan_name: data["car_plan_name"],
+              car_plan_id: (data["car_plan_id"] || 0).toString(),
+              car_plan_name: (data["car_plan_name"] || "").toString(),
               car_class: data["car_class"],
           }
           for(let j = 0; j < reqData.length; j++){
@@ -514,7 +368,79 @@ async function generateReqJson(data){
     }
 }
 
-async function importReserves(reqData){
+async function fetchOtaInfo(agentid){
+  try{
+    const token = await getAuthToken()
+    let url = baseScopeUrl + "api/rentacar/agent/convert/agentid?agentid="+agentid
+    let params = {
+      headers: {
+        ContentType: "application/json",
+        Authorization: "Bearer " + token
+      }
+    }
+    console.log(params)
+    const execUpdate = await axios.get(url, params)
+    console.log(execUpdate.data)
+    if(execUpdate.status == 200){
+      return execUpdate.data;
+    } else {
+      return "ng" 
+    }
+  } catch(e){
+    console.log(e.response)
+    return "ng"
+  }
+}
+
+async function convertCarClassId(carClassStr){
+  try{
+    const token = await getAuthToken()
+    let url = baseScopeUrl + "api/rentacar/agent/convert/car?classname="+carClassStr
+    let params = {
+      headers: {
+        ContentType: "application/json",
+        Authorization: "Bearer " + token
+      }
+    }
+    console.log(params)
+    const execUpdate = await axios.get(url, params)
+    console.log(execUpdate.data)
+    if(execUpdate.status == 200){
+      return execUpdate.data;
+    } else {
+      return "ng" 
+    }
+  } catch(e){
+    console.log(e.response)
+    return "ng"
+  }
+}
+
+async function convertOffice(office){
+  try{
+    const token = await getAuthToken()
+    let url = baseScopeUrl + "api/rentacar/agent/convert/shop?shopname="+office
+    let params = {
+      headers: {
+        ContentType: "application/json",
+        Authorization: "Bearer " + token
+      }
+    }
+    console.log(params)
+    const execUpdate = await axios.get(url, params)
+    console.log(execUpdate.data)
+    if(execUpdate.status == 200){
+      return execUpdate.data;
+    } else {
+      return "ng" 
+    }
+  } catch(e){
+    console.log(e.response)
+    return "ng"
+  }
+}
+
+async function importReserves(reqData,rawJson){
     let url = "https://www.pine-sys.com/admin/apisites/save_data/booking_new/";
     let bodyJson = {
     Login: {
@@ -563,6 +489,27 @@ async function importReserves(reqData){
   } else {
     return {failed: 'get call failed!', status: req_rensapo.status, body: req_rensapo.body};  
   }
+}
+
+async function sendErrToShops(reqData, rawJson){
+  let params = {
+    'agentname': rawJson.ota_name,
+    'reserveno': reqData.car_reservation_no,
+    'csname': reqData.Kana1,
+    'dept_datetime': reqData.date,
+    'arr_datetime': reqData.dateE,
+    'dept_shopname': rawJson.start_office,
+    'car_class': reqData.carClass,
+    'reserved_datetime': reqData,reserved_datetime,
+    'cid': contract_id
+  }
+  let url = "https://admincontrol.carcontroller.net/api/v1/notify";
+  let options = {
+      headers: {}
+  }
+  const req_convert = await axios.post(url, params, options);
+  console.log("Err msg send status:"+req_convert.status);
+  return req_convert.status;
 }
 
 async function sendReserveMail(data, email){
@@ -627,7 +574,7 @@ async function sendReserveMail(data, email){
 async function getHonbun(agent, type){
   try{
     const token = await getAuthToken()
-    let url = "https://oceantravel.scopeapps.net/api/rentacar/agent/settings/mail?agentid="+agent+"&mailtype="+type
+    let url = baseScopeUrl + "api/rentacar/agent/settings/mail?agentid="+agent+"&mailtype="+type
     let params = {
       headers: {
         ContentType: "application/json",
@@ -646,32 +593,8 @@ async function getHonbun(agent, type){
     console.log(e.response)
     return "ng"
   }
-  // var s3 = new AWS.S3();
-  // var params = {
-  //     Bucket: 'agentsys.mailformat',
-  //     Key: 'mail/reserve_done.txt'
-  // };
-  // switch(type){
-  //   case "cancel":
-  //     params.Key = 'mail/oceantravel/cancel_done.txt'
-  //     break;
-  //   case "reserve":
-  //     params.Key = 'mail/oceantravel/reserve_done.txt'
-  //     break;
-  //   default: break;
-  // }
-  // return new Promise(function(resolve, reject){
-  //     s3.getObject(params, function(err, data) {
-  //       if (err) {
-  //           console.log(err, err.stack);
-  //           reject(err)
-  //       } else {
-  //           var object = data.Body.toString();
-  //           resolve(object);
-  //       }
-  //   })
-  // })
 }
+
 async function genMailHonbun(data,dataGen,keys,honbun){
   return new Promise(function(resolve, reject){
     console.log(keys.length)
@@ -695,7 +618,6 @@ async function genMailHonbun(data,dataGen,keys,honbun){
     }
   })
 }
-
 
 async function sendCancelMail(data, email){
   var honbun_read = await getHonbun(2);
